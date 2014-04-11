@@ -191,7 +191,6 @@ extern PyObject *PyMareError;
 			} \
 		} \
 	}
-#endif
 
 // this is a wrap helper. It takes a pointer to the type and calls the
 // constructor with a "wrap" argument. This should probably be changed to
@@ -227,11 +226,26 @@ extern PyObject *PyMareError;
 		Py_DECREF(pe); \
 		if (s) Py_INCREF(s); \
 		return s; \
+	} \
+	type str_to_##type(const char *s) \
+	{ \
+		PyObject *e = PyDict_GetItemString(dict_##type##_fromstr, s); \
+		if (!e) return -1; \
+		return PyLong_AsLong(e); \
+	} \
+	const char *type##_to_str(type e) \
+	{ \
+		PyObject *pe = PyInt_FromLong(e); \
+		PyObject *s = PyDict_GetItem(dict_##type##_tostr, pe); \
+		Py_DECREF(pe); \
+		if (s) return PyString_AsString(s); \
+		else return NULL; \
 	}
 
 // put this in the enum header file
 #define PYMARE_ENUM_HEADER(type) \
 	PyObject *type##_to_pystr(type e); type pystr_to_##type(PyObject *s); \
+	const char *type##_to_str(type e); type str_to_##type(const char *s); \
 	extern PyObject *dict_##type##_fromstr; \
 	extern PyObject *dict_##type##_tostr; \
 
@@ -249,6 +263,14 @@ extern PyObject *PyMareError;
 #define PYMARE_ENUM_ADD(type, e) \
 	PyDict_SetItemString(dict_##type##_fromstr, #e, PyLong_FromLong(e)); \
 	PyDict_SetItem(dict_##type##_tostr, PyLong_FromLong(e), PyString_FromString(#e));
+
+// compatibility
+#define PYMARE_ENUM_FROMSTR(type, v, v_str, fail) \
+	{ v = str_to_##type(v_str); \
+	if (v == -1) { PyErr_SetString(PyMareError, "Unrecognized "#type); fail; } }
+#define PYMARE_ENUM_TOSTR(type, v, v_str, fail) \
+	{ v_str = type##_to_str(v); \
+	if (v_str == NULL) { PyErr_SetString(PyMareError, "Unrecognized "#type); fail; } }
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -272,3 +294,4 @@ extern PyObject *PyMareError;
 
 
 // Are your eyes bleeding yet?
+#endif
